@@ -1,6 +1,6 @@
 from asyncio import windows_events
 from turtle import shape
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -148,3 +148,32 @@ class Functions:
         """
         th = 256 // div
         return np.clip(img // th * th + th // 2, 0, 255)
+
+    @staticmethod
+    def normalizeHistgram(img: np.ndarray, range: Tuple[int]):
+        img = img.astype(np.float64)
+        
+        c = np.min(img)
+        d = np.max(img)
+        
+        output = (range[1]-range[0])*(img-c)/(d-c)+range[0]
+        output[img<c] = range[0]
+        output[img>=d] = range[1]
+        
+        output = np.clip(output, 0, 255)
+        
+        return output
+    
+    @staticmethod
+    def scaleShiftHistgram(img: np.ndarray, loc: float, scale: float):
+        img = img.astype(np.float64)
+        
+        mean = np.mean(img)
+        std = np.std(img)
+        
+        output = scale * (img - mean) / std + loc
+        output = np.clip(output, 0, 255)
+        
+        return output
+        
+        

@@ -22,12 +22,12 @@ class Main:
         # =================================================================================
 
         # Array ===========================================================================
-        self.imgArray_128 = np.array(self.img_128)
-        self.imgArray_256 = np.array(self.img_256)
-        self.imgArray_512 = np.array(self.img_512)
+        self.imgArray_128 = np.array(self.img_128, dtype=np.float64)
+        self.imgArray_256 = np.array(self.img_256, dtype=np.float64)
+        self.imgArray_512 = np.array(self.img_512, dtype=np.float64)
 
-        self.imgArray_256_noise = np.array(self.img_256_noise)
-        self.imgArray_256_dark = np.array(self.img_256_dark)
+        self.imgArray_256_noise = np.array(self.img_256_noise, dtype=np.float64)
+        self.imgArray_256_dark = np.array(self.img_256_dark, dtype=np.float64)
         # =================================================================================
         pass
 
@@ -154,9 +154,9 @@ def main():
     # mainObject.question15()
     # mainObject.question16()
     # mainObject.question17()
-    # mainObject.question18()
+    mainObject.question18()
     # mainObject.question19()
-    mainObject.question20()
+    # mainObject.question20()
 
 
 if __name__ == "__main__":
