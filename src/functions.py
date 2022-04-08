@@ -10,6 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
+from skimage import io
+
 # autopep8: on
 
 
@@ -87,11 +89,11 @@ class Functions:
         Returns:
             np.ndarray: HSV
         """
-        _img = img.copy().astype(np.float32)  # / 255
+        _img = img.copy().astype(np.float64)  # / 255
         v_max = _img.max(axis=2)
         v_min = _img.min(axis=2)
         v_argmin = _img.argmin(axis=2)
-        hsv = np.zeros_like(_img, dtype=np.float32)
+        hsv = np.zeros_like(_img, dtype=np.float64)
         r, g, b = np.split(_img, 3, axis=2)
         r, g, b = r[..., 0], g[..., 0], b[..., 0]
 
@@ -934,7 +936,7 @@ class Functions:
         ax.add_patch(plt.Rectangle((resx, resy), wt, ht,
                      fill=False, edgecolor='red', linewidth=3.5))
         plt.show()
-        
+
     def templateMatchingSAD(img, template):
         h, w, c = img.shape
         ht, wt, ct = template.shape
@@ -944,7 +946,7 @@ class Functions:
 
         for y in range(h - ht):
             for x in range(w - wt):
-                _v = np.sum(np.abs(img[y : y + ht, x : x + wt] - template))
+                _v = np.sum(np.abs(img[y: y + ht, x: x + wt] - template))
 
                 if _v < v:
                     v = _v
@@ -952,7 +954,8 @@ class Functions:
 
         fig, ax = plt.subplots()
         ax.imshow(img.astype(np.uint8))
-        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        ax.add_patch(plt.Rectangle((resx, resy), wt, ht,
+                     fill=False, edgecolor='red', linewidth=3.5))
         plt.show()
 
     def templateMatchingNCC(img, template):
@@ -964,21 +967,23 @@ class Functions:
 
         for y in range(h - ht):
             for x in range(w - wt):
-                _v = np.sum(img[y : y + ht, x : x + wt] * template)
-                _v /= (np.sqrt(np.sum(img[y : y + ht, x : x + wt] ** 2)) * np.sqrt(np.sum(template ** 2)))
+                _v = np.sum(img[y: y + ht, x: x + wt] * template)
+                _v /= (np.sqrt(np.sum(img[y: y + ht, x: x + wt]
+                       ** 2)) * np.sqrt(np.sum(template ** 2)))
                 if _v > v:
                     v = _v
                     resx, resy = x, y
 
         fig, ax = plt.subplots()
         ax.imshow(img.astype(np.uint8))
-        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        ax.add_patch(plt.Rectangle((resx, resy), wt, ht,
+                     fill=False, edgecolor='red', linewidth=3.5))
         plt.show()
-        
+
     def templateMatchingZNCC(img, template):
         h, w, c = img.shape
         ht, wt, ct = template.shape
-        
+
         _img = img.copy() - img.mean()
         _template = template.copy() - template.mean()
 
@@ -987,17 +992,19 @@ class Functions:
 
         for y in range(h - ht):
             for x in range(w - wt):
-                _v = np.sum(_img[y : y + ht, x : x + wt] * template)
-                _v /= (np.sqrt(np.sum(_img[y : y + ht, x : x + wt] ** 2)) * np.sqrt(np.sum(_template ** 2)))
+                _v = np.sum(_img[y: y + ht, x: x + wt] * template)
+                _v /= (np.sqrt(np.sum(_img[y: y + ht, x: x + wt]
+                       ** 2)) * np.sqrt(np.sum(_template ** 2)))
                 if _v > v:
                     v = _v
                     resx, resy = x, y
 
         fig, ax = plt.subplots()
         ax.imshow(img.astype(np.uint8))
-        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        ax.add_patch(plt.Rectangle((resx, resy), wt, ht,
+                     fill=False, edgecolor='red', linewidth=3.5))
         plt.show()
-        
+
     def labeling_4nn(img):
         h, w = img.shape
 
@@ -1014,12 +1021,12 @@ class Functions:
                 # skip black pixel
                 if label[y, x] == 0:
                     continue
-                
+
                 # get above pixel
-                c3 = label[max(y-1,0), x]
+                c3 = label[max(y-1, 0), x]
 
                 # get left pixel
-                c5 = label[y, max(x-1,0)]
+                c5 = label[y, max(x-1, 0)]
 
                 # if not labeled
                 if c3 < 2 and c5 < 2:
@@ -1032,14 +1039,14 @@ class Functions:
                     vs = [a for a in _vs if a > 1]
                     v = min(vs)
                     label[y, x] = v
-                    
+
                     minv = v
                     for _v in vs:
                         if LUT[_v] != 0:
                             minv = min(minv, LUT[_v])
                     for _v in vs:
                         LUT[_v] = minv
-                        
+
         count = 1
 
         # integrate index of look up table
@@ -1060,7 +1067,7 @@ class Functions:
             out[label == (i+2)] = COLORS[lut-2]
 
         return out
-    
+
     def labeling_8nn(img):
         # get image shape
         h, w = img.shape
@@ -1079,13 +1086,13 @@ class Functions:
                 if label[y, x] == 0:
                     continue
                 # get right top pixel
-                c2 = label[max(y-1,0), min(x+1, w-1)]
+                c2 = label[max(y-1, 0), min(x+1, w-1)]
                 # get top pixel
-                c3 = label[max(y-1,0), x]
+                c3 = label[max(y-1, 0), x]
                 # get left top pixel
-                c4 = label[max(y-1,0), max(x-1,0)]
+                c4 = label[max(y-1, 0), max(x-1, 0)]
                 # get left pixel
-                c5 = label[y, max(x-1,0)]
+                c5 = label[y, max(x-1, 0)]
 
                 # if all pixel is non labeled
                 if c3 < 2 and c5 < 2 and c2 < 2 and c4 < 2:
@@ -1104,7 +1111,7 @@ class Functions:
                             minv = min(minv, LUT[_v])
                     for _v in vs:
                         LUT[_v] = minv
-                        
+
         count = 1
 
         # integrate labeled index of look up table
@@ -1125,8 +1132,884 @@ class Functions:
             out[label == (i+2)] = COLORS[lut-2]
 
         return out
-    
+
     def alphaBlend(img1, img2, alpha):
         out = img1 * alpha + img2 * (1 - alpha)
         out = np.clip(out, 0, 255)
         return out
+
+    def connect_4(img):
+        # get shape
+        h, w = img.shape
+
+        # prepare temporary image
+        tmp = np.zeros((h, w), dtype=int)
+
+        # binarize
+        tmp[img > 0] = 1
+
+        # prepare out image
+        out = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # each pixel
+        for y in range(h):
+            for x in range(w):
+                if tmp[y, x] < 1:
+                    continue
+
+                S = 0
+                S += (tmp[y, min(x + 1, w - 1)] - tmp[y, min(x + 1, w - 1)] *
+                      tmp[max(y - 1, 0), min(x + 1, w - 1)] * tmp[max(y - 1, 0), x])
+                S += (tmp[max(y - 1, 0), x] - tmp[max(y - 1, 0), x] *
+                      tmp[max(y - 1, 0), max(x - 1, 0)] * tmp[y, max(x - 1, 0)])
+                S += (tmp[y, max(x - 1, 0)] - tmp[y, max(x - 1, 0)] *
+                      tmp[min(y + 1, h - 1), max(x - 1, 0)] * tmp[min(y + 1, h - 1), x])
+                S += (tmp[min(y + 1, h - 1), x] - tmp[min(y + 1, h - 1), x] *
+                      tmp[min(y + 1, h - 1), min(x + 1, w - 1)] * tmp[y, min(x + 1, w - 1)])
+
+                if S == 0:
+                    out[y, x] = [0, 0, 255]
+                elif S == 1:
+                    out[y, x] = [0, 255, 0]
+                elif S == 2:
+                    out[y, x] = [255, 0, 0]
+                elif S == 3:
+                    out[y, x] = [255, 255, 0]
+                elif S == 4:
+                    out[y, x] = [255, 0, 255]
+
+        out = out.astype(np.uint8)
+
+        return out
+
+    def connect_8(img):
+        # get shape
+        h, w = img.shape
+
+        # prepare temporary
+        _tmp = np.zeros((h, w), dtype=int)
+
+        # get binarize
+        _tmp[img > 0] = 1
+
+        # inverse for connect 8
+        tmp = 1 - _tmp
+
+        # prepare image
+        out = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # each pixel
+        for y in range(h):
+            for x in range(w):
+                if _tmp[y, x] < 1:
+                    continue
+
+                S = 0
+                S += (tmp[y, min(x + 1, w - 1)] - tmp[y, min(x + 1, w - 1)] *
+                      tmp[max(y - 1, 0), min(x + 1, w - 1)] * tmp[max(y - 1, 0), x])
+                S += (tmp[max(y - 1, 0), x] - tmp[max(y - 1, 0), x] *
+                      tmp[max(y - 1, 0), max(x - 1, 0)] * tmp[y, max(x - 1, 0)])
+                S += (tmp[y, max(x - 1, 0)] - tmp[y, max(x - 1, 0)] *
+                      tmp[min(y + 1, h - 1), max(x - 1, 0)] * tmp[min(y + 1, h - 1), x])
+                S += (tmp[min(y + 1, h - 1), x] - tmp[min(y + 1, h - 1), x] *
+                      tmp[min(y + 1, h - 1), min(x + 1, w - 1)] * tmp[y, min(x + 1, w - 1)])
+
+                if S == 0:
+                    out[y, x] = [0, 0, 255]
+                elif S == 1:
+                    out[y, x] = [0, 255, 0]
+                elif S == 2:
+                    out[y, x] = [255, 0, 0]
+                elif S == 3:
+                    out[y, x] = [255, 255, 0]
+                elif S == 4:
+                    out[y, x] = [255, 0, 255]
+
+        out = out.astype(np.uint8)
+
+        return out
+
+    def thinning(img):
+        # get shape
+        h, w = img.shape
+
+        # prepare out image
+        out = np.zeros((h, w), dtype=int)
+        out[img > 0] = 1
+
+        count = 1
+        while count > 0:
+            count = 0
+            tmp = out.copy()
+            # each pixel ( rasta scan )
+            for y in range(h):
+                for x in range(w):
+                    # skip black pixel
+                    if out[y, x] < 1:
+                        continue
+
+                    # count satisfied conditions
+                    judge = 0
+
+                    # condition 1
+                    if (tmp[y, min(x + 1, w - 1)] + tmp[max(y - 1, 0), x] + tmp[y, max(x - 1, 0)] + tmp[min(y + 1, h - 1), x]) < 4:
+                        judge += 1
+
+                    # condition 2
+                    c = 0
+                    c += (tmp[y, min(x + 1, w - 1)] - tmp[y, min(x + 1, w - 1)] *
+                          tmp[max(y - 1, 0), min(x + 1,  w - 1)] * tmp[max(y - 1, 0), x])
+                    c += (tmp[max(y - 1, 0), x] - tmp[max(y - 1, 0), x] *
+                          tmp[max(y - 1, 0), max(x - 1, 0)] * tmp[y, max(x - 1, 0)])
+                    c += (tmp[y, max(x - 1, 0)] - tmp[y, max(x - 1, 0)] *
+                          tmp[min(y + 1, h - 1), max(x - 1, 0)] * tmp[min(y + 1, h - 1), x])
+                    c += (tmp[min(y + 1, h - 1), x] - tmp[min(y + 1, h - 1), x] *
+                          tmp[min(y + 1, h - 1), min(x + 1, w - 1)] * tmp[y, min(x + 1,  w - 1)])
+                    if c == 1:
+                        judge += 1
+
+                    # x condition 3
+                    if np.sum(tmp[max(y - 1, 0): min(y + 2, h), max(x - 1, 0): min(x + 2, w)]) >= 4:
+                        judge += 1
+
+                    # if all conditions are satisfied
+                    if judge == 3:
+                        out[y, x] = 0
+                        count += 1
+
+        out = out.astype(np.uint8) * 255
+
+        return out
+
+    def hilditchThinning(img):
+        # get shape
+        H, W = img.shape
+
+        # prepare out image
+        out = np.zeros((H, W), dtype=int)
+        out[img > 0] = 1
+
+        # inverse pixel value
+        tmp = out.copy()
+        _tmp = 1 - tmp
+
+        count = 1
+        while count > 0:
+            count = 0
+            tmp = out.copy()
+            _tmp = 1 - tmp
+
+            tmp2 = out.copy()
+            _tmp2 = 1 - tmp2
+
+            # each pixel
+            for y in range(H):
+                for x in range(W):
+                    # skip black pixel
+                    if out[y, x] < 1:
+                        continue
+
+                    judge = 0
+
+                    # condition 1
+                    if (tmp[y, min(x+1, W-1)] * tmp[max(y-1, 0), x] * tmp[y, max(x-1, 0)] * tmp[min(y+1, H-1), x]) == 0:
+                        judge += 1
+
+                    # condition 2
+                    c = 0
+                    c += (_tmp[y, min(x+1, W-1)] - _tmp[y, min(x+1, W-1)] *
+                          _tmp[max(y-1, 0), min(x+1, W-1)] * _tmp[max(y-1, 0), x])
+                    c += (_tmp[max(y-1, 0), x] - _tmp[max(y-1, 0), x] *
+                          _tmp[max(y-1, 0), max(x-1, 0)] * _tmp[y, max(x-1, 0)])
+                    c += (_tmp[y, max(x-1, 0)] - _tmp[y, max(x-1, 0)] *
+                          _tmp[min(y+1, H-1), max(x-1, 0)] * _tmp[min(y+1, H-1), x])
+                    c += (_tmp[min(y+1, H-1), x] - _tmp[min(y+1, H-1), x] *
+                          _tmp[min(y+1, H-1), min(x+1, W-1)] * _tmp[y, min(x+1, W-1)])
+                    if c == 1:
+                        judge += 1
+
+                    # condition 3
+                    if np.sum(tmp[max(y-1, 0): min(y+2, H), max(x-1, 0): min(x+2, W)]) >= 3:
+                        judge += 1
+
+                    # condition 4
+                    if np.sum(out[max(y-1, 0): min(y+2, H), max(x-1, 0): min(x+2, W)]) >= 2:
+                        judge += 1
+
+                    # condition 5
+                    _tmp2 = 1 - out
+
+                    c = 0
+                    c += (_tmp2[y, min(x+1, W-1)] - _tmp2[y, min(x+1, W-1)] *
+                          _tmp2[max(y-1, 0), min(x+1, W-1)] * _tmp2[max(y-1, 0), x])
+                    c += (_tmp2[max(y-1, 0), x] - _tmp2[max(y-1, 0), x] *
+                          (1 - tmp[max(y-1, 0), max(x-1, 0)]) * _tmp2[y, max(x-1, 0)])
+                    c += (_tmp2[y, max(x-1, 0)] - _tmp2[y, max(x-1, 0)] *
+                          _tmp2[min(y+1, H-1), max(x-1, 0)] * _tmp2[min(y+1, H-1), x])
+                    c += (_tmp2[min(y+1, H-1), x] - _tmp2[min(y+1, H-1), x] *
+                          _tmp2[min(y+1, H-1), min(x+1, W-1)] * _tmp2[y, min(x+1, W-1)])
+                    if c == 1 or (out[max(y-1, 0), max(x-1, 0)] != tmp[max(y-1, 0), max(x-1, 0)]):
+                        judge += 1
+
+                    c = 0
+                    c += (_tmp2[y, min(x+1, W-1)] - _tmp2[y, min(x+1, W-1)] *
+                          _tmp2[max(y-1, 0), min(x+1, W-1)] * (1 - tmp[max(y-1, 0), x]))
+                    c += ((1-tmp[max(y-1, 0), x]) - (1 - tmp[max(y-1, 0), x])
+                          * _tmp2[max(y-1, 0), max(x-1, 0)] * _tmp2[y, max(x-1, 0)])
+                    c += (_tmp2[y, max(x-1, 0)] - _tmp2[y, max(x-1, 0)] *
+                          _tmp2[min(y+1, H-1), max(x-1, 0)] * _tmp2[min(y+1, H-1), x])
+                    c += (_tmp2[min(y+1, H-1), x] - _tmp2[min(y+1, H-1), x] *
+                          _tmp2[min(y+1, H-1), min(x+1, W-1)] * _tmp2[y, min(x+1, W-1)])
+                    if c == 1 or (out[max(y-1, 0), x] != tmp[max(y-1, 0), x]):
+                        judge += 1
+
+                    c = 0
+                    c += (_tmp2[y, min(x+1, W-1)] - _tmp2[y, min(x+1, W-1)] *
+                          (1 - tmp[max(y-1, 0), min(x+1, W-1)]) * _tmp2[max(y-1, 0), x])
+                    c += (_tmp2[max(y-1, 0), x] - _tmp2[max(y-1, 0), x] *
+                          _tmp2[max(y-1, 0), max(x-1, 0)] * _tmp2[y, max(x-1, 0)])
+                    c += (_tmp2[y, max(x-1, 0)] - _tmp2[y, max(x-1, 0)] *
+                          _tmp2[min(y+1, H-1), max(x-1, 0)] * _tmp2[min(y+1, H-1), x])
+                    c += (_tmp2[min(y+1, H-1), x] - _tmp2[min(y+1, H-1), x] *
+                          _tmp2[min(y+1, H-1), min(x+1, W-1)] * _tmp2[y, min(x+1, W-1)])
+                    if c == 1 or (out[max(y-1, 0), min(x+1, W-1)] != tmp[max(y-1, 0), min(x+1, W-1)]):
+                        judge += 1
+
+                    c = 0
+                    c += (_tmp2[y, min(x+1, W-1)] - _tmp2[y, min(x+1, W-1)] *
+                          _tmp2[max(y-1, 0), min(x+1, W-1)] * _tmp2[max(y-1, 0), x])
+                    c += (_tmp2[max(y-1, 0), x] - _tmp2[max(y-1, 0), x] *
+                          _tmp2[max(y-1, 0), max(x-1, 0)] * (1 - tmp[y, max(x-1, 0)]))
+                    c += ((1 - tmp[y, max(x-1, 0)]) - (1 - tmp[y, max(x-1, 0)]) *
+                          _tmp2[min(y+1, H-1), max(x-1, 0)] * _tmp2[min(y+1, H-1), x])
+                    c += (_tmp2[min(y+1, H-1), x] - _tmp2[min(y+1, H-1), x] *
+                          _tmp2[min(y+1, H-1), min(x+1, W-1)] * _tmp2[y, min(x+1, W-1)])
+                    if c == 1 or (out[y, max(x-1, 0)] != tmp[y, max(x-1, 0)]):
+                        judge += 1
+
+                    if judge >= 8:
+                        out[y, x] = 0
+                        count += 1
+
+        out = out.astype(np.uint8) * 255
+
+        return out
+
+    def zhangSuenThinning(img):
+        # get shape
+        H, W = img.shape
+
+        # prepare out image
+        out = np.zeros((H, W), dtype=int)
+        out[img > 0] = 1
+
+        # inverse
+        out = 1 - out
+
+        while True:
+            s1 = []
+            s2 = []
+
+            # step 1 ( rasta scan )
+            for y in range(1, H-1):
+                for x in range(1, W-1):
+
+                    # condition 1
+                    if out[y, x] > 0:
+                        continue
+
+                    # condition 2
+                    f1 = 0
+                    if (out[y-1, x+1] - out[y-1, x]) == 1:
+                        f1 += 1
+                    if (out[y, x+1] - out[y-1, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x+1] - out[y, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x] - out[y+1, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x-1] - out[y+1, x]) == 1:
+                        f1 += 1
+                    if (out[y, x-1] - out[y+1, x-1]) == 1:
+                        f1 += 1
+                    if (out[y-1, x-1] - out[y, x-1]) == 1:
+                        f1 += 1
+                    if (out[y-1, x] - out[y-1, x-1]) == 1:
+                        f1 += 1
+
+                    if f1 != 1:
+                        continue
+
+                    # condition 3
+                    f2 = np.sum(out[y-1:y+2, x-1:x+2])
+                    if f2 < 2 or f2 > 6:
+                        continue
+
+                    # condition 4
+                    if out[y-1, x] + out[y, x+1] + out[y+1, x] < 1:
+                        continue
+
+                    # condition 5
+                    if out[y, x+1] + out[y+1, x] + out[y, x-1] < 1:
+                        continue
+
+                    s1.append([y, x])
+
+            for v in s1:
+                out[v[0], v[1]] = 1
+
+            # step 2 ( rasta scan )
+            for y in range(1, H-1):
+                for x in range(1, W-1):
+
+                    # condition 1
+                    if out[y, x] > 0:
+                        continue
+
+                    # condition 2
+                    f1 = 0
+                    if (out[y-1, x+1] - out[y-1, x]) == 1:
+                        f1 += 1
+                    if (out[y, x+1] - out[y-1, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x+1] - out[y, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x] - out[y+1, x+1]) == 1:
+                        f1 += 1
+                    if (out[y+1, x-1] - out[y+1, x]) == 1:
+                        f1 += 1
+                    if (out[y, x-1] - out[y+1, x-1]) == 1:
+                        f1 += 1
+                    if (out[y-1, x-1] - out[y, x-1]) == 1:
+                        f1 += 1
+                    if (out[y-1, x] - out[y-1, x-1]) == 1:
+                        f1 += 1
+
+                    if f1 != 1:
+                        continue
+
+                    # condition 3
+                    f2 = np.sum(out[y-1:y+2, x-1:x+2])
+                    if f2 < 2 or f2 > 6:
+                        continue
+
+                    # condition 4
+                    if out[y-1, x] + out[y, x+1] + out[y, x-1] < 1:
+                        continue
+
+                    # condition 5
+                    if out[y-1, x] + out[y+1, x] + out[y, x-1] < 1:
+                        continue
+
+                    s2.append([y, x])
+
+            for v in s2:
+                out[v[0], v[1]] = 1
+
+            # if not any pixel is changed
+            if len(s1) < 1 and len(s2) < 1:
+                break
+
+        out = 1 - out
+        out = out.astype(np.uint8) * 255
+
+        return out
+
+    # Magnitude and gradient
+    def getGradXY(gray):
+        h, w = gray.shape
+
+        # padding before grad
+        _gray = np.pad(gray, (1, 1), 'edge').astype(float)
+
+        # get grad x
+        gx = _gray[1: h + 1, 2:] - _gray[1: h + 1, : w]
+        # get grad y
+        gy = _gray[2:, 1: w + 1] - _gray[: h, 1: w + 1]
+        # replace 0 with
+        gx[np.abs(gx) <= 1e-10] = 1e-10
+        return gx, gy
+
+    # get magnitude and gradient
+    def getMagAndGrad(gx, gy):
+        # get gradient maginitude
+        mag = np.sqrt(gx ** 2 + gy ** 2)
+
+        # get gradient angle
+        grad = np.arctan(gy / gx)
+        grad[grad < 0] = np.pi / 2 + grad[grad < 0] + np.pi / 2
+
+        return mag, grad
+
+    # gradient histogram
+    def histgramQuantization(grad):
+        # prepare quantization table
+        grad_q = np.zeros_like(grad, dtype=float)
+
+        # quantization base
+        d = np.pi / 9
+
+        # quantization
+        for i in range(9):
+            grad_q[np.where((grad >= d * i) & (grad <= d * (i + 1)))] = i
+
+        return grad_q
+
+    def gradientHistogram(grad_q, mag, n=8):
+        h, w = mag.shape
+
+        # get cell num
+        cell_n_h = h // n
+        cell_n_w = w // n
+        histogram = np.zeros((cell_n_h, cell_n_w, 9), dtype=np.float32)
+
+        # each pixel
+        for y in range(cell_n_h):
+            for x in range(cell_n_w):
+                for j in range(n):
+                    for i in range(n):
+                        histogram[y, x, int(
+                            grad_q[y * n + j, x * n + i])] += mag[y * n + j, x * n + i]
+
+        return histogram
+
+    def hogNormalization(histogram, c=3, epsilon=1):
+        cell_n_h, cell_n_w, hist_c = histogram.shape
+        hist_norm = histogram.copy()
+
+        # each histogram
+        for y in range(cell_n_h):
+            for x in range(cell_n_w):
+                for c in range(hist_c):
+                    hist_norm[y, x, c] /= np.sqrt(np.sum(histogram[max(y - 1, 0): min(
+                        y + 2, cell_n_h), max(x - 1, 0): min(x + 2, cell_n_w), c] ** 2) + epsilon)
+
+        return hist_norm
+
+    def drawHOG(gray, histogram, n=8):
+        h, w = gray.shape
+        cell_n_h, cell_n_w, _ = histogram.shape
+
+        out = gray[1:  h + 1, 1:  w + 1].copy().astype(np.uint8)
+        out = (out * 0.8).astype(np.uint8)
+
+        for y in range(cell_n_h):
+            for x in range(cell_n_w):
+                cx = x * n + n // 2
+                cy = y * n + n // 2
+                x1 = cx + n // 2 - 1
+                y1 = cy
+                x2 = cx - n // 2 + 1
+                y2 = cy
+
+                h = histogram[y, x] / np.sum(histogram[y, x])
+                h /= h.max()
+
+                for c in range(9):
+                    #angle = (20 * c + 10 - 90) / 180. * np.pi
+                    # get angle
+                    angle = (20 * c + 10) / 180. * np.pi
+                    rx = int(np.sin(angle) * (x1 - cx) +
+                             np.cos(angle) * (y1 - cy) + cx)
+                    ry = int(np.cos(angle) * (x1 - cx) -
+                             np.cos(angle) * (y1 - cy) + cy)
+                    lx = int(np.sin(angle) * (x2 - cx) +
+                             np.cos(angle) * (y2 - cy) + cx)
+                    ly = int(np.cos(angle) * (x2 - cx) -
+                             np.cos(angle) * (y2 - cy) + cy)
+
+                    # color is HOG value
+                    c = int(255. * h[c])
+
+                    # draw line
+                    cv2.line(out, (lx, ly), (rx, ry), (c, c, c), thickness=1)
+
+        return out
+
+    def getMask(hsv) -> np.ndarray:
+        h = hsv[..., 0]
+        mask = np.zeros_like(h).astype(np.uint8)
+        mask[((h < 90) | (h > 140))] = 1
+        return mask
+
+    def morphologyOpen(img, repeat=1):
+        out = Functions.morphologyDilate(img, repeat=repeat)
+        out = Functions.morphologyErode(out, repeat=repeat)
+        return out
+
+    def morphologyClose(img, repeat=1):
+        out = Functions.morphologyErode(img, repeat=repeat)
+        out = Functions.morphologyDilate(out, repeat=repeat)
+        return out
+
+    def bilinearInterGray(img, a, b):
+        h, w = img.shape
+        out_h = int(h * a)
+        out_w = int(w * b)
+
+        xs, ys = np.meshgrid(range(out_w), range(out_h))  # output image index
+
+        _xs = np.floor(xs / b).astype(int)  # original x
+        _ys = np.floor(ys / a).astype(int)  # original y
+
+        dx = xs / b - _xs
+        dy = ys / a - _ys
+
+        # dx = np.repeat(np.expand_dims(dx, axis=-1), c, axis=-1) # repeat channel
+        # dy = np.repeat(np.expand_dims(dy, axis=-1), c, axis=-1) # repeat channel
+
+        _xs1p = np.minimum(_xs + 1, w - 1)
+        _ys1p = np.minimum(_ys + 1, h - 1)
+
+        out = (1 - dx) * (1 - dy) * img[_ys, _xs] + dx * (1 - dy) * img[_ys, _xs1p] + \
+            (1 - dx) * dy * img[_ys1p, _xs] + dx * dy * img[_ys1p, _xs1p]
+
+        return np.clip(out, 0, 255).astype(np.uint8)
+
+    def gaborFilter(K_size=111, Sigma=10, Gamma=1.2, Lambda=10, Psi=0, angle=0):
+        # get half size
+        d = K_size // 2
+
+        # prepare kernel
+        gabor = np.zeros((K_size, K_size), dtype=np.float32)
+
+        # each value
+        for y in range(K_size):
+            for x in range(K_size):
+                # distance from center
+                px = x - d
+                py = y - d
+
+                # degree -> radian
+                theta = angle / 180. * np.pi
+
+                # get kernel x
+                _x = np.cos(theta) * px + np.sin(theta) * py
+
+                # get kernel y
+                _y = -np.sin(theta) * px + np.cos(theta) * py
+
+                # fill kernel
+                gabor[y, x] = np.exp(-(_x**2 + Gamma**2 * _y**2) /
+                                     (2 * Sigma**2)) * np.cos(2*np.pi*_x/Lambda + Psi)
+
+        # kernel normalization
+        gabor /= np.sum(np.abs(gabor))
+
+        return gabor
+
+    def gaborFiltering(gray, K_size=111, Sigma=10, Gamma=1.2, Lambda=10, Psi=0, angle=0):
+        H, W = gray.shape
+        # padding
+        gray = np.pad(gray, (K_size//2, K_size//2), 'edge')
+
+        # prepare out image
+        out = np.zeros((H, W), dtype=np.float32)
+
+        # get gabor filter
+        gabor = Functions.gaborFilter(
+            K_size=K_size, Sigma=Sigma, Gamma=Gamma, Lambda=Lambda, Psi=0, angle=angle)
+
+        # filtering
+        for y in range(H):
+            for x in range(W):
+                out[y, x] = np.sum(gray[y: y + K_size, x: x + K_size] * gabor)
+
+        out = np.clip(out, 0, 255)
+        out = out.astype(np.uint8)
+
+        return out
+
+    def hessianCorner(gray):
+        # Sobel
+        def sobelFiltering(gray):
+            # get shape
+            H, W = gray.shape
+
+            # sobel kernel
+            sobely = np.array(((1, 2, 1),
+                               (0, 0, 0),
+                               (-1, -2, -1)), dtype=np.float32)
+
+            sobelx = np.array(((1, 0, -1),
+                               (2, 0, -2),
+                               (1, 0, -1)), dtype=np.float32)
+
+            # padding
+            tmp = np.pad(gray, (1, 1), 'edge')
+
+            # prepare
+            Ix = np.zeros_like(gray, dtype=np.float32)
+            Iy = np.zeros_like(gray, dtype=np.float32)
+
+            # get differential
+            for y in range(H):
+                for x in range(W):
+                    Ix[y, x] = np.mean(tmp[y: y + 3, x: x + 3] * sobelx)
+                    Iy[y, x] = np.mean(tmp[y: y + 3, x: x + 3] * sobely)
+
+            Ix2 = Ix ** 2
+            Iy2 = Iy ** 2
+            Ixy = Ix * Iy
+
+            return Ix2, Iy2, Ixy
+
+        # Hessian
+        def cornerDetect(gray, Ix2, Iy2, Ixy, pad=2):
+            # get shape
+            H, W = gray.shape
+
+            # prepare for show detection
+            out = np.array((gray, gray, gray))
+            out = np.transpose(out, (1, 2, 0))
+
+            # get Hessian value
+            Hes = np.zeros((H, W))
+
+            for y in range(H):
+                for x in range(W):
+                    Hes[y, x] = Ix2[y, x] * Iy2[y, x] - Ixy[y, x] ** 2
+
+            # Detect Corner and show
+            for y in range(H):
+                for x in range(W):
+                    if Hes[y, x] == np.max(Hes[max(y-1, 0): min(y+2, H), max(x-1, 0): min(x+2, W)]) and Hes[y, x] > np.max(Hes) * 0.1:
+                        out[y - pad: y + pad, x - pad: x + pad] = [255, 0, 0]
+
+            out = out.astype(np.uint8)
+
+            return out
+
+        #  image sobel
+        Ix2, Iy2, Ixy = sobelFiltering(gray)
+
+        # corner detection
+        out = cornerDetect(gray, Ix2, Iy2, Ixy)
+
+        return out
+
+    def sobelFiltering(gray):
+        # get shape
+        H, W = gray.shape
+
+        # sobel kernel
+        sobely = np.array(((1, 2, 1),
+                           (0, 0, 0),
+                           (-1, -2, -1)), dtype=np.float32)
+
+        sobelx = np.array(((1, 0, -1),
+                           (2, 0, -2),
+                           (1, 0, -1)), dtype=np.float32)
+
+        # padding
+        tmp = np.pad(gray, (1, 1), 'edge')
+
+        # prepare
+        Ix = np.zeros_like(gray, dtype=np.float32)
+        Iy = np.zeros_like(gray, dtype=np.float32)
+
+        # get differential
+        for y in range(H):
+            for x in range(W):
+                Ix[y, x] = np.mean(tmp[y: y + 3, x: x + 3] * sobelx)
+                Iy[y, x] = np.mean(tmp[y: y + 3, x: x + 3] * sobely)
+
+        Ix2 = Ix ** 2
+        Iy2 = Iy ** 2
+        Ixy = Ix * Iy
+
+        return Ix2, Iy2, Ixy
+
+    # gaussian filtering
+
+    def gaussianFiltering(I, K_size=3, sigma=3):
+        # get shape
+        H, W = I.shape
+
+        # gaussian
+        I_t = np.pad(I, (K_size // 2, K_size // 2), 'edge')
+
+        # gaussian kernel
+        K = np.zeros((K_size, K_size), dtype=np.float32)
+        for x in range(K_size):
+            for y in range(K_size):
+                _x = x - K_size // 2
+                _y = y - K_size // 2
+                K[y, x] = np.exp(-(_x ** 2 + _y ** 2) / (2 * (sigma ** 2)))
+        K /= (sigma * np.sqrt(2 * np.pi))
+        K /= K.sum()
+
+        # filtering
+        for y in range(H):
+            for x in range(W):
+                I[y, x] = np.sum(I_t[y: y + K_size, x: x + K_size] * K)
+
+        return I
+
+    def cornerDetect(gray, Ix2, Iy2, Ixy, k=0.04, th=0.1):
+        # prepare output image
+        out = np.array((gray, gray, gray))
+        out = np.transpose(out, (1, 2, 0))
+
+        # get R
+        R = (Ix2 * Iy2 - Ixy ** 2) - k * ((Ix2 + Iy2) ** 2)
+
+        # detect corner
+        out[R >= np.max(R) * th] = [255, 0, 0]
+
+        out = out.astype(np.uint8)
+
+        return out
+
+    def dicColor(img):
+        img = img // 64 * 64 + 32
+        return img
+
+    def getFeature(img):
+        feat = np.zeros(12, dtype=np.float32)
+
+        for i in range(4):
+            feat[i, ] = (img[..., 0] == (64 * i + 32)).sum()
+            feat[i + 4] = (img[..., 1] == (64 * i + 32)).sum()
+            feat[i + 8] = (img[..., 2] == (64 * i + 32)).sum()
+
+        return feat
+
+    def getDB():
+        train_paths = [
+            "../dataset/train/akahara_1.jpg",
+            "../dataset/train/akahara_2.jpg",
+            "../dataset/train/akahara_3.jpg",
+            "../dataset/train/madara_1.jpg",
+            "../dataset/train/madara_2.jpg",
+            "../dataset/train/madara_3.jpg"
+        ]
+
+        # prepare database
+        db = np.zeros((len(train_paths), 13), dtype=np.float32)
+
+        # each image
+        for i, path in enumerate(train_paths):
+            print(path)
+            img = io.imread(path)
+            img = cv2.resize(
+                img, (128, 128), interpolation=cv2.INTER_CUBIC)
+            img = Functions.dicColor(img)
+            feat = Functions.getFeature(img)
+            db[i, :-1] = feat
+
+            # get class
+            if 'akahara' in path:
+                cls = 0
+            elif 'madara' in path:
+                cls = 1
+
+            # store class label
+            db[i, -1] = cls
+
+        return db, train_paths
+
+    def assignLabelInit(db, paths, class_n=2):
+        feats = db.copy()
+
+        # assign random label
+        np.random.seed(0)
+        feats[:, -1] = np.random.randint(0, class_n, (len(db)))
+
+        # prepare gravity
+        gs = np.zeros((class_n, feats.shape[1] - 1), dtype=np.float32)
+
+        # get gravity
+        for i in range(class_n):
+            gs[i] = np.mean(
+                feats[np.where(feats[..., -1] == i)[0], :12], axis=0)
+
+        print("Assigned label")
+        print(feats[:, -1])
+        print("Gravity")
+        print(gs)
+
+    def kmeans(db, paths, class_n=2):
+        feats = db.copy()
+        feat_n = feats.shape[1] - 1
+
+        # assign random label
+        np.random.seed(0)
+        feats[:, -1] = np.random.randint(0, class_n, (len(db)))
+
+        # prepare gravity
+        gs = np.zeros((class_n, feat_n), dtype=np.float32)
+
+        # get gravity
+        for i in range(class_n):
+            gs[i] = np.mean(
+                feats[np.where(feats[..., -1] == i)[0], :feat_n], axis=0)
+
+        while True:
+            # prepare greavity
+            gs = np.zeros((class_n, feat_n), dtype=np.float32)
+            change_count = 0
+
+            # compute gravity
+            for i in range(class_n):
+                gs[i] = np.mean(
+                    feats[np.where(feats[..., -1] == i)[0], :feat_n], axis=0)
+
+            # re-labeling
+            for i in range(len(feats)):
+                # get distance each nearest graviry
+                dis = np.sqrt(
+                    np.sum(np.square(np.abs(gs - feats[i, :feat_n])), axis=1))
+
+                # get new label
+                pred = np.argmin(dis, axis=0)
+
+                # if label is difference from old label
+                if int(feats[i, -1]) != pred:
+                    change_count += 1
+                    feats[i, -1] = pred
+
+            if change_count < 1:
+                break
+
+        for i in range(db.shape[0]):
+            print(paths[i].split("/")[-1], " Pred:", feats[i, -1])
+
+    def getDBAll():
+        train_paths = [
+            "../dataset/train/akahara_1.jpg",
+            "../dataset/train/akahara_2.jpg",
+            "../dataset/train/akahara_3.jpg",
+            "../dataset/train/madara_1.jpg",
+            "../dataset/train/madara_2.jpg",
+            "../dataset/train/madara_3.jpg",
+            "../dataset/test/akahara_1.jpg",
+            "../dataset/test/akahara_2.jpg",
+            "../dataset/test/akahara_3.jpg",
+            "../dataset/test/madara_1.jpg",
+            "../dataset/test/madara_2.jpg",
+            "../dataset/test/madara_3.jpg"
+        ]
+        
+        # prepare database
+        db = np.zeros((len(train_paths), 13), dtype=np.float32)
+
+        # each image
+        for i, path in enumerate(train_paths):
+            print(path)
+            img = io.imread(path)
+            img = cv2.resize(img, (128, 128), interpolation=cv2.INTER_CUBIC)
+            img = Functions.dicColor(img)
+            feat = Functions.getFeature(img)
+            db[i, :-1] = feat
+
+            # get class
+            if 'akahara' in path:
+                cls = 0
+            elif 'madara' in path:
+                cls = 1
+
+            # store class label
+            db[i, -1] = cls
+
+        return db, train_paths
