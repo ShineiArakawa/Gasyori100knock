@@ -1,4 +1,5 @@
 # autopep8: off
+import imp
 import os
 import time
 if os.name == "nt":
@@ -413,7 +414,8 @@ class Functions:
         h, w, channel = img.shape
 
         [a, b, tx], [c, d, ty] = affine_mat
-        out_h, out_w = out_shape
+        out_h, out_w = map(int, out_shape)
+        # out_h, out_w = out_shape
 
         out = np.zeros([out_h, out_w, channel])
 
@@ -448,3 +450,683 @@ class Functions:
                     [0, 0, 1]]
         return [[np.cos(theta), -np.sin(theta), 0],
                 [np.sin(theta), np.cos(theta), 0]]
+
+    @staticmethod
+    def DFT(imgArray: np.ndarray):
+        import cupy as cp
+        imgArray = cp.asarray(imgArray)
+
+        height, width = imgArray.shape
+        freq = cp.empty(shape=(height, width), dtype=cp.float32)
+        xMesh, yMesh = cp.meshgrid(cp.arange(0, width),
+                                   cp.arange(0, height))
+
+        for i in range(height):
+            for j in range(width):
+                freq[i][j] = cp.sum(imgArray *
+                                    cp.exp(-2j*cp.pi*(j*xMesh/width + i*yMesh/height)))
+
+        freq = cp.asnumpy(freq)
+        return freq
+
+    @staticmethod
+    def IDFT(freq: np.ndarray):
+        import cupy as cp
+        freq = cp.asarray(freq)
+
+        height, width = freq.shape
+        imgArray = cp.empty(shape=(height, width),
+                            dtype=cp.float32)
+        xMesh, yMesh = cp.meshgrid(cp.arange(0, width),
+                                   cp.arange(0, height))
+
+        for i in range(height):
+            for j in range(width):
+                imgArray[i][j] = cp.abs(
+                    cp.sum(freq * cp.exp(2j*cp.pi*(j*xMesh/width + i*yMesh/height))))
+
+        imgArray /= (height * width)
+        imgArray = cp.asnumpy(imgArray)
+        return imgArray
+
+    @staticmethod
+    def lowPassFilter(G, ratio=0.5):
+        H, W = G.shape
+        h_half = H // 2
+        w_half = W // 2
+
+        # transfer positions
+        _G = np.zeros_like(G)
+        _G[:h_half, :w_half] = G[h_half:, w_half:]
+        _G[:h_half, w_half:] = G[h_half:, :w_half]
+        _G[h_half:, :w_half] = G[:h_half, w_half:]
+        _G[h_half:, w_half:] = G[:h_half, :w_half]
+
+        # filtering
+        x, y = np.meshgrid(np.arange(0, W) - w_half, np.arange(0, H) - h_half)
+
+        r = np.sqrt(x ** 2 + y ** 2)
+        mask = np.ones((H, W), dtype=np.float32)
+        mask[r > (h_half * ratio)] = 0
+        _G *= mask
+
+        # reverse original positions
+        out = np.zeros_like(_G)
+        out[:h_half, :w_half] = _G[h_half:, w_half:]
+        out[:h_half, w_half:] = _G[h_half:, :w_half]
+        out[h_half:, :w_half] = _G[:h_half, w_half:]
+        out[h_half:, w_half:] = _G[:h_half, :w_half]
+
+        return out
+
+    @staticmethod
+    def highPassFilter(G, ratio=0.1):
+        H, W = G.shape
+        h_half = H // 2
+        w_half = W // 2
+
+        # transfer positions
+        _G = np.zeros_like(G)
+        _G[:h_half, :w_half] = G[h_half:, w_half:]
+        _G[:h_half, w_half:] = G[h_half:, :w_half]
+        _G[h_half:, :w_half] = G[:h_half, w_half:]
+        _G[h_half:, w_half:] = G[:h_half, :w_half]
+
+        # filtering
+        x, y = np.meshgrid(np.arange(0, W) - w_half, np.arange(0, H) - h_half)
+        r = np.sqrt(x ** 2 + y ** 2)
+        mask = np.ones((H, W), dtype=np.float32)
+        mask[r < (h_half * ratio)] = 0
+        _G *= mask
+
+        # reverse original positions
+        out = np.zeros_like(_G)
+        out[:h_half, :w_half] = _G[h_half:, w_half:]
+        out[:h_half, w_half:] = _G[h_half:, :w_half]
+        out[h_half:, :w_half] = _G[:h_half, w_half:]
+        out[h_half:, w_half:] = _G[:h_half, :w_half]
+
+        return out
+
+    @staticmethod
+    def bandPassFilter(G, low=0.1, high=0.5):
+        H, W = G.shape
+        h_half = H // 2
+        w_half = W // 2
+
+        # transfer positions
+        _G = np.zeros_like(G)
+        _G[:h_half, :w_half] = G[h_half:, w_half:]
+        _G[:h_half, w_half:] = G[h_half:, :w_half]
+        _G[h_half:, :w_half] = G[:h_half, w_half:]
+        _G[h_half:, w_half:] = G[:h_half, :w_half]
+
+        # filtering
+        x, y = np.meshgrid(np.arange(0, W) - w_half, np.arange(0, H) - h_half)
+        r = np.sqrt(x ** 2 + y ** 2)
+        mask = np.ones((H, W), dtype=np.float32)
+        mask[(r < (h_half * low)) | (r > (h_half * high))] = 0
+        _G *= mask
+
+        # reverse original positions
+        out = np.zeros_like(_G)
+        out[:h_half, :w_half] = _G[h_half:, w_half:]
+        out[:h_half, w_half:] = _G[h_half:, :w_half]
+        out[h_half:, :w_half] = _G[:h_half, w_half:]
+        out[h_half:, w_half:] = _G[:h_half, :w_half]
+
+        return out
+
+    @staticmethod
+    def DCT(img, T=8, channel=3, toEnableCupy=False):
+        if toEnableCupy:
+            try:
+                import cupy as cp
+                np = cp
+                img = cp.asarray(img)
+            except:
+                toEnableCupy = False
+
+        H, W, _ = img.shape
+        F = np.zeros((H, W, channel), dtype=np.float32)
+
+        theta = np.pi / (2 * T)
+
+        for c in range(channel):
+            for vi in range(0, H, T):
+                for ui in range(0, W, T):
+                    for v in range(T):
+                        for u in range(T):
+                            cu = 1 / np.sqrt(2) if u == 0 else 1
+                            cv = 1 / np.sqrt(2) if v == 0 else 1
+                            coef1, coef2 = np.meshgrid(np.cos(
+                                (2 * np.arange(0, T) + 1) * u * theta), np.cos((2 * np.arange(0, T) + 1) * v * theta))
+                            F[vi + v, ui + u, c] = 2 * cu * cv * \
+                                np.sum(img[vi: vi + T, ui: ui + T, c]
+                                       * coef1 * coef2) / T
+
+        if toEnableCupy:
+            F = cp.asnumpy(F)
+        return F
+
+    @staticmethod
+    def IDCT(F,  T=8, K=8, channel=3, toEnableCupy=False):
+        if toEnableCupy:
+            try:
+                import cupy as cp
+                np = cp
+                F = cp.asarray(F)
+            except:
+                toEnableCupy = False
+
+        H, W, _ = F.shape
+        out = np.zeros((H, W, channel), dtype=np.float32)
+
+        theta = np.pi / (2 * T)
+
+        c_mat = np.ones([T, T])
+        c_mat[0] /= np.sqrt(2)
+        c_mat[:, 0] /= np.sqrt(2)
+
+        for c in range(channel):
+            for yi in range(0, H, T):
+                for xi in range(0, W, T):
+                    for y in range(T):
+                        for x in range(T):
+                            coef1, coef2 = np.meshgrid(np.cos(
+                                (2 * x + 1) * np.arange(0, T) * theta), np.cos((2 * y + 1) * np.arange(0, T) * theta))
+                            out[yi + y, xi + x, c] = 2 * np.sum(
+                                F[yi: yi + K, xi: xi + K, c] * coef1[:K, :K] * coef2[:K, :K] * c_mat[:K, :K]) / T
+
+        out = np.clip(out, 0, 255)
+        out = np.round(out).astype(np.uint8)
+
+        if toEnableCupy:
+            out = cp.asnumpy(out)
+
+        return out
+
+    # MSE
+    def mse(img1, img2):
+        h, w, c = img1.shape
+        mse = np.sum((img1 - img2) ** 2) / (h * w * c)
+        return mse
+
+    # PSNR
+    def PSNR(img1, img2, vmax=255):
+        _mse = 1e-10 if Functions.mse(img1,
+                                      img2) == 0 else Functions.mse(img1,
+                                                                    img2)
+        return 10 * np.log10(vmax * vmax / _mse)
+
+    # bitrate
+    def bitrate(t, k):
+        return 1. * t * (k ** 2) / (t ** 2)
+
+    def quantization(F, T=8):
+        h, w, channel = F.shape
+
+        Q = np.array([[12, 18, 24, 30, 36, 42, 48, 54],
+                      [18, 24, 30, 36, 42, 48, 54, 60],
+                      [24, 30, 36, 42, 48, 54, 60, 66],
+                      [30, 36, 42, 48, 54, 60, 66, 72],
+                      [36, 42, 48, 54, 60, 66, 72, 78],
+                      [42, 48, 54, 60, 66, 72, 78, 84],
+                      [48, 54, 60, 66, 72, 78, 84, 90],
+                      [54, 60, 66, 72, 78, 84, 90, 96]])
+
+        for ys in range(0, h, T):
+            for xs in range(0, w, T):
+                for c in range(channel):
+                    F[ys: ys + T, xs: xs + T,
+                        c] = np.round(F[ys: ys + T, xs: xs + T, c] / Q) * Q
+
+        return F
+
+    def rgb2ycbcr(img):
+        h, w, _ = img.shape
+        ycbcr = np.zeros([h, w, 3], dtype=np.float32)
+        ycbcr[..., 0] = 0.2990 * img[..., 2] + \
+            0.5870 * img[..., 1] + 0.1140 * img[..., 0]
+        ycbcr[..., 1] = -0.1687 * img[..., 2] - 0.3313 * \
+            img[..., 1] + 0.5 * img[..., 0] + 128.
+        ycbcr[..., 2] = 0.5 * img[..., 2] - 0.4187 * \
+            img[..., 1] - 0.0813 * img[..., 0] + 128.
+        return ycbcr
+
+    # Y Cb Cr -> BGR
+    def ycbcr2rgb(ycbcr):
+        h, w, _ = ycbcr.shape
+        out = np.zeros([h, w, 3], dtype=np.float32)
+        out[..., 2] = ycbcr[..., 0] + (ycbcr[..., 2] - 128.) * 1.4020
+        out[..., 1] = ycbcr[..., 0] - \
+            (ycbcr[..., 1] - 128.) * 0.3441 - (ycbcr[..., 2] - 128.) * 0.7139
+        out[..., 0] = ycbcr[..., 0] + (ycbcr[..., 1] - 128.) * 1.7718
+
+        out = np.clip(out, 0, 255)
+        out = out.astype(np.uint8)
+        return out
+
+    def getEdgeAngle(fx, fy):
+        edge = np.sqrt(np.power(fx, 2) + np.power(fy, 2))
+        fx = np.maximum(fx, 1e-5)
+        angle = np.arctan(fy / fx)
+        return edge, angle
+
+    def angleQuantization(angle):
+        angle = angle / np.pi * 180
+        angle[angle < -22.5] = 180 + angle[angle < -22.5]
+        _angle = np.zeros_like(angle, dtype=np.uint8)
+        _angle[np.where(angle <= 22.5)] = 0
+        _angle[np.where((angle > 22.5) & (angle <= 67.5))] = 45
+        _angle[np.where((angle > 67.5) & (angle <= 112.5))] = 90
+        _angle[np.where((angle > 112.5) & (angle <= 157.5))] = 135
+        return _angle
+
+    def nonMaximumSuppression(angle: np.ndarray, edge: np.ndarray):
+        print(angle.shape)
+        H, W = angle.shape
+        _edge = edge.copy()
+
+        for y in range(H):
+            for x in range(W):
+                if angle[y, x] == 0:
+                    dx1, dy1, dx2, dy2 = -1, 0, 1, 0
+                elif angle[y, x] == 45:
+                    dx1, dy1, dx2, dy2 = -1, 1, 1, -1
+                elif angle[y, x] == 90:
+                    dx1, dy1, dx2, dy2 = 0, -1, 0, 1
+                elif angle[y, x] == 135:
+                    dx1, dy1, dx2, dy2 = -1, -1, 1, 1
+                if x == 0:
+                    dx1 = max(dx1, 0)
+                    dx2 = max(dx2, 0)
+                if x == W-1:
+                    dx1 = min(dx1, 0)
+                    dx2 = min(dx2, 0)
+                if y == 0:
+                    dy1 = max(dy1, 0)
+                    dy2 = max(dy2, 0)
+                if y == H-1:
+                    dy1 = min(dy1, 0)
+                    dy2 = min(dy2, 0)
+                if max(max(edge[y, x], edge[y + dy1, x + dx1]), edge[y + dy2, x + dx2]) != edge[y, x]:
+                    _edge[y, x] = 0
+
+        return _edge
+
+    def hysterisis(edge, HT=100, LT=30):
+        H, W = edge.shape
+
+        # Histeresis threshold
+        edge[edge >= HT] = 255
+        edge[edge <= LT] = 0
+
+        _edge = np.zeros((H + 2, W + 2), dtype=np.float32)
+        _edge[1: H + 1, 1: W + 1] = edge
+
+        # 8 - Nearest neighbor
+        nn = np.array(((1., 1., 1.), (1., 0., 1.),
+                      (1., 1., 1.)), dtype=np.float32)
+
+        for y in range(1, H+2):
+            for x in range(1, W+2):
+                if _edge[y, x] < LT or _edge[y, x] > HT:
+                    continue
+                if np.max(_edge[y-1:y+2, x-1:x+2] * nn) >= HT:
+                    _edge[y, x] = 255
+                else:
+                    _edge[y, x] = 0
+
+        edge = _edge[1:H+1, 1:W+1]
+
+        return edge
+
+    def voting(edge):
+        H, W = edge.shape
+        drho = 1
+        dtheta = 1
+
+        # get rho max length
+        rho_max = np.ceil(np.sqrt(H ** 2 + W ** 2)).astype(int)
+
+        # hough table
+        hough = np.zeros((rho_max * 2, 180), dtype=int)
+
+        # get index of edge
+        ind = np.where(edge == 255)
+
+        # hough transformation
+        for y, x in zip(ind[0], ind[1]):
+            for theta in range(0, 180, dtheta):
+                # get polar coordinat4s
+                t = np.pi / 180 * theta
+                rho = int(x * np.cos(t) + y * np.sin(t))
+                # vote
+                hough[rho + rho_max, theta] += 1
+
+        out = hough.astype(np.uint8)
+        return out
+
+        # non maximum suppression
+    def nonMaximumSuppressionHoughLines(hough):
+        rho_max, _ = hough.shape
+
+        # non maximum suppression
+        for y in range(rho_max):
+            for x in range(180):
+                # get 8 nearest neighbor
+                x1 = max(x-1, 0)
+                x2 = min(x+2, 180)
+                y1 = max(y-1, 0)
+                y2 = min(y+2, rho_max-1)
+                if np.max(hough[y1:y2, x1:x2]) == hough[y, x] and hough[y, x] != 0:
+                    pass
+                    #hough[y,x] = 255
+                else:
+                    hough[y, x] = 0
+
+        # for hough visualization
+        # get top-10 x index of hough table
+        ind_x = np.argsort(hough.ravel())[::-1][:20]
+        # get y index
+        ind_y = ind_x.copy()
+        thetas = ind_x % 180
+        rhos = ind_y // 180
+        _hough = np.zeros_like(hough, dtype=int)
+        _hough[rhos, thetas] = 255
+
+        return _hough
+
+    def inverseHough(hough, img):
+        H, W, _ = img.shape
+        rho_max, _ = hough.shape
+
+        out = img.copy()
+
+        # get x, y index of hough table
+        ind_x = np.argsort(hough.ravel())[::-1][:20]
+        ind_y = ind_x.copy()
+        thetas = ind_x % 180
+        rhos = ind_y // 180 - rho_max / 2
+
+        # each theta and rho
+        for theta, rho in zip(thetas, rhos):
+            # theta[radian] -> angle[degree]
+            t = np.pi / 180. * theta
+
+            # hough -> (x,y)
+            for x in range(W):
+                if np.sin(t) != 0:
+                    y = - (np.cos(t) / np.sin(t)) * x + (rho) / np.sin(t)
+                    y = int(y)
+                    if y >= H or y < 0:
+                        continue
+                    out[y, x] = [255, 0, 0]
+            for y in range(H):
+                if np.cos(t) != 0:
+                    x = - (np.sin(t) / np.cos(t)) * y + (rho) / np.cos(t)
+                    x = int(x)
+                    if x >= W or x < 0:
+                        continue
+                    out[y, x] = [255, 0, 0]
+
+        out = out.astype(np.uint8)
+
+        return out
+
+    def morphologyErode(img, repeat=1):
+        h, w = img.shape
+        out = img.copy()
+
+        # kernel
+        mf = np.array(((0, 1, 0),
+                       (1, 0, 1),
+                       (0, 1, 0)), dtype=int)
+
+        # each erode
+        for i in range(repeat):
+            tmp = np.pad(out, (1, 1), 'edge')
+            # erode
+            for y in range(1, h + 1):
+                for x in range(1, w + 1):
+                    if np.sum(mf * tmp[y-1:y+2, x-1:x+2]) < 255*4:
+                        out[y-1, x-1] = 0
+
+        return out
+
+    def morphologyDilate(img, repeat=1):
+        h, w = img.shape
+
+        # kernel
+        mf = np.array(((0, 1, 0),
+                       (1, 0, 1),
+                       (0, 1, 0)), dtype=int)
+
+        # each dilate time
+        out = img.copy()
+        for i in range(repeat):
+            tmp = np.pad(out, (1, 1), 'edge')
+            for y in range(1, h+1):
+                for x in range(1, w+1):
+                    if np.sum(mf * tmp[y-1:y+2, x-1:x+2]) >= 255:
+                        out[y-1, x-1] = 255
+
+        return out
+
+    def templateMatchingSSD(img, template):
+        h, w, c = img.shape
+        ht, wt, ct = template.shape
+
+        resx, resy = -1, -1
+        v = 255 * h * w * c
+
+        for y in range(h - ht):
+            for x in range(w - wt):
+                _v = np.sum((img[y: y + ht, x: x + wt] - template) ** 2)
+
+                if _v < v:
+                    v = _v
+                    resx, resy = x, y
+
+        fig, ax = plt.subplots()
+        ax.imshow(img.astype(np.uint8))
+        ax.add_patch(plt.Rectangle((resx, resy), wt, ht,
+                     fill=False, edgecolor='red', linewidth=3.5))
+        plt.show()
+        
+    def templateMatchingSAD(img, template):
+        h, w, c = img.shape
+        ht, wt, ct = template.shape
+
+        resx, resy = -1, -1
+        v = 255 * h * w * c
+
+        for y in range(h - ht):
+            for x in range(w - wt):
+                _v = np.sum(np.abs(img[y : y + ht, x : x + wt] - template))
+
+                if _v < v:
+                    v = _v
+                    resx, resy = x, y
+
+        fig, ax = plt.subplots()
+        ax.imshow(img.astype(np.uint8))
+        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        plt.show()
+
+    def templateMatchingNCC(img, template):
+        h, w, c = img.shape
+        ht, wt, ct = template.shape
+
+        resx, resy = -1, -1
+        v = -1
+
+        for y in range(h - ht):
+            for x in range(w - wt):
+                _v = np.sum(img[y : y + ht, x : x + wt] * template)
+                _v /= (np.sqrt(np.sum(img[y : y + ht, x : x + wt] ** 2)) * np.sqrt(np.sum(template ** 2)))
+                if _v > v:
+                    v = _v
+                    resx, resy = x, y
+
+        fig, ax = plt.subplots()
+        ax.imshow(img.astype(np.uint8))
+        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        plt.show()
+        
+    def templateMatchingZNCC(img, template):
+        h, w, c = img.shape
+        ht, wt, ct = template.shape
+        
+        _img = img.copy() - img.mean()
+        _template = template.copy() - template.mean()
+
+        resx, resy = -1, -1
+        v = -1
+
+        for y in range(h - ht):
+            for x in range(w - wt):
+                _v = np.sum(_img[y : y + ht, x : x + wt] * template)
+                _v /= (np.sqrt(np.sum(_img[y : y + ht, x : x + wt] ** 2)) * np.sqrt(np.sum(_template ** 2)))
+                if _v > v:
+                    v = _v
+                    resx, resy = x, y
+
+        fig, ax = plt.subplots()
+        ax.imshow(img.astype(np.uint8))
+        ax.add_patch( plt.Rectangle((resx, resy), wt, ht, fill=False, edgecolor='red', linewidth=3.5) )
+        plt.show()
+        
+    def labeling_4nn(img):
+        h, w = img.shape
+
+        label = np.zeros((h, w), dtype=int)
+        label[img > 0] = 1
+
+        # look up table
+        LUT = [0 for _ in range(h * w)]
+
+        n = 1
+
+        for y in range(h):
+            for x in range(w):
+                # skip black pixel
+                if label[y, x] == 0:
+                    continue
+                
+                # get above pixel
+                c3 = label[max(y-1,0), x]
+
+                # get left pixel
+                c5 = label[y, max(x-1,0)]
+
+                # if not labeled
+                if c3 < 2 and c5 < 2:
+                    # labeling
+                    n += 1
+                    label[y, x] = n
+                else:
+                    # replace min label index
+                    _vs = [c3, c5]
+                    vs = [a for a in _vs if a > 1]
+                    v = min(vs)
+                    label[y, x] = v
+                    
+                    minv = v
+                    for _v in vs:
+                        if LUT[_v] != 0:
+                            minv = min(minv, LUT[_v])
+                    for _v in vs:
+                        LUT[_v] = minv
+                        
+        count = 1
+
+        # integrate index of look up table
+        for l in range(2, n+1):
+            flag = True
+            for i in range(n+1):
+                if LUT[i] == l:
+                    if flag:
+                        count += 1
+                        flag = False
+                    LUT[i] = count
+
+        # draw color
+        COLORS = [[0, 0, 255], [0, 255, 0], [255, 0, 0], [255, 255, 0]]
+        out = np.zeros((h, w, 3), dtype=np.uint8)
+
+        for i, lut in enumerate(LUT[2:]):
+            out[label == (i+2)] = COLORS[lut-2]
+
+        return out
+    
+    def labeling_8nn(img):
+        # get image shape
+        h, w = img.shape
+
+        # prepare labeling image
+        label = np.zeros((h, w), dtype=int)
+        label[img > 0] = 1
+
+        # look up table
+        LUT = [0 for _ in range(h * w)]
+
+        n = 1
+
+        for y in range(h):
+            for x in range(w):
+                if label[y, x] == 0:
+                    continue
+                # get right top pixel
+                c2 = label[max(y-1,0), min(x+1, w-1)]
+                # get top pixel
+                c3 = label[max(y-1,0), x]
+                # get left top pixel
+                c4 = label[max(y-1,0), max(x-1,0)]
+                # get left pixel
+                c5 = label[y, max(x-1,0)]
+
+                # if all pixel is non labeled
+                if c3 < 2 and c5 < 2 and c2 < 2 and c4 < 2:
+                    n += 1
+                    label[y, x] = n
+                else:
+                    # get labeled index
+                    _vs = [c3, c5, c2, c4]
+                    vs = [a for a in _vs if a > 1]
+                    v = min(vs)
+                    label[y, x] = v
+
+                    minv = v
+                    for _v in vs:
+                        if LUT[_v] != 0:
+                            minv = min(minv, LUT[_v])
+                    for _v in vs:
+                        LUT[_v] = minv
+                        
+        count = 1
+
+        # integrate labeled index of look up table
+        for l in range(2, n+1):
+            flag = True
+            for i in range(n+1):
+                if LUT[i] == l:
+                    if flag:
+                        count += 1
+                        flag = False
+                    LUT[i] = count
+
+        # draw color
+        COLORS = [[0, 0, 255], [0, 255, 0], [255, 0, 0], [255, 255, 0]]
+        out = np.zeros((h, w, 3), dtype=np.uint8)
+
+        for i, lut in enumerate(LUT[2:]):
+            out[label == (i+2)] = COLORS[lut-2]
+
+        return out
+    
+    def alphaBlend(img1, img2, alpha):
+        out = img1 * alpha + img2 * (1 - alpha)
+        out = np.clip(out, 0, 255)
+        return out
