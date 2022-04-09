@@ -10,6 +10,7 @@ from PIL import Image
 from skimage import io
 
 from functions import Functions
+from nn import NeuralNet, NeuralNet2, sliding_window_classify
 
 
 class Main:
@@ -57,6 +58,9 @@ class Main:
         self.img_gazo = Image.open(
             "../dataset/images/gazo_sample.png"
         )
+        self.img_madara = Image.open(
+            "../dataset/images/madara_256x256.png"
+        )
         # =================================================================================
 
         # Array ===========================================================================
@@ -86,110 +90,145 @@ class Main:
                                          dtype=np.float64)
         self.imgArray_gazo = np.array(self.img_gazo,
                                       dtype=np.float64)
+        self.imgArray_madara = np.array(self.img_madara,
+                                      dtype=np.float64)
         # =================================================================================
         pass
 
-    def question81(self):
-        """Hessianのコーナー検出
+    def question91(self):
+        """K-meansによる減色処理 (Step.1) 色の距離によるクラス分類
         """
-        img_thorino_gray = np.array(self.img_thorino.convert("L"))
-        img_thorino_hessian = Functions.hessianCorner(img_thorino_gray)
+        out = Functions.colorKmeansStep1(self.imgArray_512)
 
-        fig, ax = plt.subplots(1, 2, figsize=(12, 12))
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
         ax[0].set_title("input")
-        ax[0].imshow(self.img_thorino, cmap="gray")
+        ax[0].imshow(self.img_512)
         ax[1].set_title("output")
-        ax[1].imshow(img_thorino_hessian, cmap="gray")
+        ax[1].imshow(out)
         plt.show()
 
-    def question82(self):
-        """Harrisのコーナー検出 (Step.1) Sobel + Gauusian
+    def question92(self):
+        """K-meansによる減色処理 (Step.2) 減色処理
         """
-        img_thorino_gray = np.array(self.img_thorino.convert("L"))
-
-        # get difference image
-        i_x2, i_y2, i_xy = Functions.sobelFiltering(img_thorino_gray)
-
-        # gaussian filtering
-        i_x2 = Functions.gaussianFiltering(i_x2, K_size=3, sigma=3)
-        i_y2 = Functions.gaussianFiltering(i_y2, K_size=3, sigma=3)
-        i_xy = Functions.gaussianFiltering(i_xy, K_size=3, sigma=3)
-
-        fig, ax = plt.subplots(1, 4, figsize=(15, 3))
+        out = Functions.colorKmeans(self.imgArray_256)
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
         ax[0].set_title("input")
-        ax[0].imshow(self.img_thorino, cmap="gray")
-        ax[1].set_title("i_x2")
-        ax[1].imshow(i_x2, cmap="gray")
-        ax[2].set_title("i_y2")
-        ax[2].imshow(i_y2, cmap="gray")
-        ax[3].set_title("i_xy")
-        ax[3].imshow(i_xy, cmap="gray")
-        plt.show()
-
-    def question83(self):
-        """Harrisのコーナー検出 (Step.2) コーナー検出
-        """
-        img_thorino_gray = np.array(self.img_thorino.convert("L"))
-        i_x2, i_y2, i_xy = Functions.sobelFiltering(img_thorino_gray)
-        i_x2 = Functions.gaussianFiltering(i_x2, K_size=3, sigma=3)
-        i_y2 = Functions.gaussianFiltering(i_y2, K_size=3, sigma=3)
-        i_xy = Functions.gaussianFiltering(i_xy, K_size=3, sigma=3)
-
-        out = Functions.cornerDetect(img_thorino_gray, i_x2, i_y2, i_xy)
-
-        fig, ax = plt.subplots(1, 2, figsize=(12, 12))
-        ax[0].set_title("input")
-        ax[0].imshow(self.img_thorino, cmap="gray")
+        ax[0].imshow(self.img_256)
         ax[1].set_title("output")
-        ax[1].imshow(out, cmap="gray")
+        ax[1].imshow(out)
+        plt.show()
+        plt.clf()
+        
+        out = Functions.colorKmeans(self.imgArray_madara)
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
+        ax[0].set_title("input")
+        ax[0].imshow(self.img_madara)
+        ax[1].set_title("output")
+        ax[1].imshow(out)
         plt.show()
 
-    def question84(self):
-        """簡単な画像認識 (Step.1) 減色化 + ヒストグラム\n
+    def question93(self):
+        """機械学習の学習データの用意 (Step.1) IoUの計算
         """
+        # [x1, y1, x2, y2]
+        a = np.array((50, 50, 150, 150), dtype=np.float32)
+        b = np.array((60, 60, 170, 160), dtype=np.float32)
+
+        print(Functions.getIOU(a, b))
+
+    def question94(self):
+        """機械学習の学習データの用意 (Step.2) ランダムクラッピング
+        """
+        # gt bounding box
+        gt = np.array((130, 120, 190, 180), dtype=np.float32)
+
+        crops, labels = Functions.crop_bbox(self.imgArray_256, gt)
+
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
+        ax[0].set_title("input")
+        ax[0].imshow(self.img_256)
+        ax[1].set_title("output")
+        ax[1].imshow(self.img_256)
+
+        for i in range(len(crops)):
+            c = "red" if labels[i] == 1 else "blue"
+            x1, y1, x2, y2 = crops[i]
+            ax[1].add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor=c, linewidth=0.5))
+
+        ax[1].add_patch(plt.Rectangle((gt[0], gt[1]), gt[2] - gt[0], gt[3] - gt[1], fill=False, edgecolor="green", linewidth=2))
+            
+        plt.show()
+
+    def question95(self):
+        """ニューラルネットワーク (Step.1) 使ってみる
+        """
+        train_x = np.array([[0,0], [0,1], [1,0], [1,1]], dtype=np.float32)
+        train_t = np.array([[0], [1], [1], [0]], dtype=np.float32)
+
+        nn = NeuralNet()
+
+        # train
+        for i in range(1000):
+            nn.forward(train_x)
+            nn.train(train_x, train_t)
+
+        # test
+        for j in range(4):
+            x = train_x[j]
+            t = train_t[j]
+            print("in:", x, "pred:", nn.forward(x))
+            
+        nn = NeuralNet2()
+
+        # train
+        for i in range(1000):
+            nn.forward(train_x)
+            nn.train(train_x, train_t)
+
+        # test
+        for j in range(4):
+            x = train_x[j]
+            t = train_t[j]
+            print("in:", x, "pred:", nn.forward(x))
+
+    def question96(self):
+        """ニューラルネットワーク (Step.2) 学習
+        """
+        # prepare gt bounding box
+        gt = np.array((130, 120, 190, 180), dtype=np.float32)
+
         # get database
-        db, train_paths = Functions.getDB()
+        db = Functions.make_dataset(self.imgArray_256, gt)
 
-        fig, ax = plt.subplots(1, 6, figsize=(15, 2))
+        # train neural network
+        # get input feature dimension
+        input_dim = db.shape[1] - 1
+        train_x = db[:, :input_dim]
+        train_t = db[:, -1][..., None]
 
-        for i in range(len(db)):
-            ax[i].set_title(train_paths[i].split("/")[-1])
-            ax[i].bar(np.arange(12), db[i, :-1])
+        nn = NeuralNet(in_dim=input_dim, lr=0.01)
 
-        plt.show()
+        # training
+        for i in range(10_000):
+            nn.forward(train_x)
+            nn.train(train_x, train_t)
 
-    def question85(self):
-        """簡単な画像認識 (Step.2) クラス判別
-        """
-        db, train_paths = Functions.getDB()
+        # test
+        accuracy_n = 0.
 
-        fig, ax = plt.subplots(1, 6, figsize=(15, 2))
-        for i in range(len(db)):
-            ax[i].set_title(train_paths[i].split("/")[-1])
-            ax[i].bar(np.arange(12), db[i, :-1])
-        plt.show()
+        for x, t in zip(train_x, train_t):
+            prob = nn.forward(x)
 
-        for path in self.test_paths:
-            img = io.imread(path)
-            img = cv2.resize(img, (128, 128), interpolation=cv2.INTER_CUBIC)
-            img = Functions.dicColor(img)
-            feat = Functions.getFeature(img)
+            # count accuracy
+            pred = 1 if prob >= 0.5 else 0
+            if t == pred:
+                accuracy_n += 1
 
-            db_diff = np.abs(db[:, :-1] - feat)
-            distances = db_diff.sum(axis=1)
-            nearest = distances.argmin()
-            pred_cls = db[nearest, -1]
-            label = "akahara" if pred_cls == 0 else "madara"
+        accuracy = accuracy_n / len(db)
+        print("Accuracy >> {} ({} / {})".format(accuracy, accuracy_n, len(db)))
 
-            print(path.split("/")[-1], ", pred >>", label)
-
-    def question86(self):
-        """簡単な画像認識 (Step.3) 評価(Accuracy)
-        """
-        raise NotImplementedError()
-
-    def question87(self):
-        """簡単な画像認識 (Step.4) k-NN
+    def question97(self):
+        """簡単な物体検出 (Step.1) スライディングウィンドウ + HOG
         """
         k = 3
 
@@ -212,26 +251,88 @@ class Main:
             
             print(path.split("/")[-1], ", pred >>", label)
             
-    def question88(self):
-        """K-means (Step.1) 重心作成
+    def question98(self):
+        """簡単な物体検出 (Step.2) スライディングウィンドウ + NN
         """
-        db, train_paths = Functions.getDB()
-        Functions.assignLabelInit(db, train_paths)
+        gt = np.array((130, 120, 190, 180), dtype=np.float32)
+        
+        detects = sliding_window_classify(self.imgArray_256)
 
-    def question89(self):
-        """K-means (Step.2) クラスタリング
-        """
-        db, train_paths = Functions.getDB()
-        Functions.assignLabelInit(db, train_paths)
-        Functions.kmeans(db, train_paths)
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
+        ax[0].set_title("input")
+        ax[0].imshow(self.img_256)
+        ax[1].set_title("output")
+        ax[1].imshow(self.img_256)
 
-    def question90(self):
-        """K-means データを増やす
+        for i in range(len(detects)):
+            x1, y1, x2, y2, score = detects[i]
+            ax[1].add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor="red", linewidth=0.5))
+
+        ax[1].add_patch(plt.Rectangle((gt[0], gt[1]), gt[2] - gt[0], gt[3] - gt[1], fill=False, edgecolor="green", linewidth=2))
+            
+        plt.show()
+
+    def question99(self):
+        """簡単な物体検出 (Step.3) Non-Maximum Suppression
         """
-        db2, train_paths2 = Functions.getDBAll()
-        print("\nkmeans")
-        Functions.assignLabelInit(db2, train_paths2)
-        Functions.kmeans(db2, train_paths2)
+        gt = np.array((130, 120, 190, 180), dtype=np.float32)
+        detects = sliding_window_classify(self.imgArray_256)
+        selected_inds = Functions.nms(detects, iou_th=0.25)
+        _detects = detects[selected_inds]
+
+        fig, ax = plt.subplots(1, 2, figsize=(6, 4))
+        ax[0].set_title("input")
+        ax[0].imshow(self.img_256)
+        ax[1].set_title("output")
+        ax[1].imshow(self.img_256)
+
+        for d in _detects:
+            x1, y1, x2, y2, score = d
+            ax[1].add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor="red", linewidth=0.5))
+
+        ax[1].add_patch(plt.Rectangle((gt[0], gt[1]), gt[2] - gt[0], gt[3] - gt[1], fill=False, edgecolor="green", linewidth=2))
+            
+        plt.show()
+
+    def question100(self):
+        """簡単な物体検出 (Step.4) 評価 Precision, Recall, F-score, mAP
+        """
+        detects = sliding_window_classify(self.imgArray_256)
+        selected_inds = Functions.nms(detects, iou_th=0.25)
+        _detects = detects[selected_inds]
+
+        gt = np.array([[130, 120, 190, 180], ], dtype=np.float32)
+
+        # Recall, Precision, F-score
+        iou_th = 0.5
+
+        Rs = np.zeros((len(gt)))
+        Ps = np.zeros((len(_detects)))
+
+        for i, g in enumerate(gt):
+            iou_x1 = np.maximum(g[0], _detects[:, 0])
+            iou_y1 = np.maximum(g[1], _detects[:, 1])
+            iou_x2 = np.minimum(g[2], _detects[:, 2])
+            iou_y2 = np.minimum(g[3], _detects[:, 3])
+            iou_s = np.maximum(0, iou_x2 - iou_x1) * np.maximum(0, iou_y2 - iou_y1)
+            g_s = (g[2] - g[0]) * (g[3] - g[1])
+            d_s = (_detects[:, 2] - _detects[:, 0]) * (_detects[:, 3] - _detects[:, 1])
+            ious = iou_s / (g_s + d_s - iou_s)
+            
+            Rs[i] = 1 if np.sum(ious >= iou_th) > 0 else 0
+            Ps[ious >= iou_th] = 1
+
+        R = np.mean(Rs)
+        P = np.mean(Ps)
+        F = (2 * P * R) / (P + R) 
+
+        print("Recall >> {:.2f} ({} / {})".format(R, np.sum(Rs), len(Rs)))
+        print("Precision >> {:.2f} ({} / {})".format(P, np.sum(Ps), len(Ps)))
+        print("F-score >> ", F)
+
+        # mAP
+        mAP = np.mean([np.sum(Ps[:i+1]) / (i + 1) for i in range(len(_detects)) if Ps[i] == 1])
+        print("mAP >>", mAP)
 
     def __plotImages(self, imgs: List[np.ndarray]):
         nImgs = len(imgs)
@@ -255,16 +356,16 @@ class Main:
 def main():
     mainObject = Main()
 
-    # mainObject.question81()
-    # mainObject.question82()
-    # mainObject.question83()
-    # mainObject.question84()
-    # mainObject.question85()
-    # mainObject.question86()
-    # mainObject.question87()
-    # mainObject.question88()
-    # mainObject.question89()
-    mainObject.question90()
+    # mainObject.question91()
+    # mainObject.question92()
+    # mainObject.question93()
+    # mainObject.question94()
+    # mainObject.question95()
+    # mainObject.question96()
+    # mainObject.question97()
+    # mainObject.question98()
+    # mainObject.question99()
+    mainObject.question100()
 
 
 if __name__ == "__main__":
